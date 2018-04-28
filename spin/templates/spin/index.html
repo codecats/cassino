@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block content %}
+
+    <nav class="navbar is-white">
+        <div class="container">
+            <div class="navbar-brand">
+                <a class="navbar-item" href="{% url 'logout' %}">Log out {{ user }}</a>
+
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="columns">
+            <div class="column is-12">
+                <section class="hero is-info welcome is-small">
+                    <div class="hero-body">
+                        <div class="container">
+                            <div class="columns">
+                                <div class="column is-9">
+                                    {% if active_wallet %}
+                                        <form action="{% url 'spin' %}" method="POST">
+                                            {% csrf_token %}
+                                            <button class="button is-primary is-large" type="submit" value="spin">SPIN</button>
+                                        </form>
+                                    {% else %}
+                                        <h1>No money to play, please use deposit button</h1>
+                                    {% endif %}
+                                </div>
+                                <div class="column is-9">
+                                    <form id="myForm" action="{% url 'deposit' %}" method="POST">
+                                        <input type="text" id="amountInDollars" />
+                                        <input type="hidden" id="stripeToken" name="stripeToken" />
+                                        <input type="hidden" id="stripeEmail" name="stripeEmail" />
+                                        <input type="hidden" id="amountInCents" name="amountInCents" />
+                                        {% csrf_token %}
+                                    </form>
+
+                                    <button class="button is-secondary is-large" type="button" id="customButton" value="Pay">Deposit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="info-tiles">
+                    <div class="tile is-ancestor has-text-centered">
+                        {% for w in wallets %}
+                            {% if not w.wallet.is_depleted %}
+                                <div class="tile is-parent">
+                                    <article class="tile is-child box">
+                                        {% if active_wallet.wallet.pk == w.wallet.pk %}
+                                            <p>&#x21E9</p>
+                                            {% if error %}
+                                                <p>{{ error }}</p>
+                                            {% endif %}
+                                        {% endif %}
+                                        <p class="title">€ {{ w.get_play_money }}</p>
+                                        <p class="subtitle">{{ w.wallet.is_real|yesno:'Money,BNS' }} Wallet {{ w.wallet.pk }} (€ {{ w.get_money }})</p>
+                                        {% if w.wallet.bonus %}
+                                            <article class="tile is-child box">
+                                                <p class="subtitle">€ {{ w.wallet.bonus.money }}</p>
+                                                <p>Wagering requirement € {{ w.wallet.bonus.wagering_required }} ({{ w.wallet.bonus.wagering }})</p>
+                                                <p>Need to spin to convert to real money € {{ w.wallet.bonus.to_real }}</p>
+                                            </article>
+                                        {% endif %}
+                                    </article>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+                <div class="columns">
+                    <div class="column is-12">
+                        <div class="card events-card">
+                            <header class="card-header">
+                                <p class="card-header-title">
+                                    Wallet changes
+                                </p>
+                                <a href="#" class="card-header-icon" aria-label="more options">
+                                  <span class="icon">
+                                    <i class="fa fa-angle-down" aria-hidden="true"></i>
+                                  </span>
+                                </a>
+                            </header>
+                            <div class="card-table">
+                                <div class="content">
+                                    <table class="table is-fullwidth is-striped">
+                                        <tbody>
+                                            {% for ch in changes %}
+                                                <tr>
+                                                    <td width="5%"><i class="fa fa-bell-o"></i></td>
+                                                    <td>
+                                                        {{ ch.wallet.is_real|yesno:'Money,BNS' }} Wallet {{ ch.wallet_id }}, change {{ ch.get_type_display }}: € {{ ch.money }}
+                                                        {% if not ch.money %} money was taken from bonus{% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <h1>Depleted</h1>
+                <section class="info-tiles">
+                    <div class="tile is-ancestor has-text-centered">
+                        {% for w in wallets %}
+                            {% if w.wallet.is_depleted %}
+                                <div class="tile is-parent">
+                                    <article class="tile is-child box">
+                                        <p class="subtitle">{{ w.wallet.is_real|yesno:'Money,BNS' }} Wallet {{ w.wallet.pk }}</p>
+                                    </article>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+    <script>
+var handler = StripeCheckout.configure({
+  key: 'pk_test_6pRNASCoBOKtIshFeQd4XMUh',
+  image: 'https://stripe.com/img/documentation/checkout/marketplace.png',
+  token: function(token) {
+    $("#stripeToken").val(token.id);
+    $("#stripeEmail").val(token.email);
+    $("#amountInCents").val(Math.floor($("#amountInDollars").val() * 100));
+    $("#myForm").submit();
+  }
+});
+
+$('#customButton').on('click', function(e) {
+  var amountInCents = Math.floor($("#amountInDollars").val() * 100);
+  var displayAmount = parseFloat(Math.floor($("#amountInDollars").val() * 100) / 100).toFixed(2);
+  if (! amountInCents) {
+      amountInCents = 1000;
+      displayAmount = 10;
+  }
+  $("#amountInDollars").val(displayAmount);
+  // Open Checkout with further options
+  handler.open({
+    name: 'Demo Site',
+    description: 'Custom amount ($' + displayAmount + ')',
+    amount: amountInCents,
+  });
+  e.preventDefault();
+});
+
+// Close Checkout on page navigation
+$(window).on('popstate', function() {
+  handler.close();
+});
+
+    </script>
+{% endblock %}
